@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -68,7 +69,7 @@ func loadPage(title string) (*Page, error) {
 
 /*
 [7]
-- The function handler is of the type http.HandlerFunc. It takes an http.ResponseWriter and an http.Request as its arguments.
+- The function homeHandler is of the type http.HandlerFunc. It takes an http.ResponseWriter and an http.Request as its arguments.
 
 - An http.ResponseWriter value assembles the HTTP server's response; by writing to it, we send data to the HTTP client.
 
@@ -78,9 +79,20 @@ func loadPage(title string) (*Page, error) {
 
 - The trailing [1:] means "create a sub-slice of Path from the 1st character to the end." This drops the leading "/" from the path name.
 */
-func handler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, "Hello world. This is the main page")
-	fmt.Fprintf(w, "Hi there, I am testing. Here's the path: %s", r.URL.Path[1:])
+func homeHandler(w http.ResponseWriter, r *http.Request) {
+	// fmt.Fprint(w, "Hello world. This is the main page")
+	// fmt.Fprintf(w, "Hi there, I am testing. Here's the path: %s", r.URL.Path[1:])
+	p, _ := loadPage("homePage")
+	renderTemplate(w, "home", p)
+}
+
+/*
+[10]
+*/
+
+func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
+	t, _ := template.ParseFiles(tmpl + ".html")
+	t.Execute(w, p)
 }
 
 /*
@@ -96,7 +108,22 @@ func handler(w http.ResponseWriter, r *http.Request) {
 func viewHandler(w http.ResponseWriter, r *http.Request) {
 	title := r.URL.Path[len("/view/"):]
 	p, _ := loadPage(title)
-	fmt.Fprintf(w, " <h1>%s<h1><div>%s<div> ", p.Title, p.Body)
+	renderTemplate(w, "view", p)
+}
+
+/*
+[9]
+-  template.ParseFiles will read the contents of edit.html and return a *template.Template.
+
+- The method t.Execute executes the template, writing the generated HTML to the http.ResponseWriter.
+*/
+func editHandler(w http.ResponseWriter, r *http.Request) {
+	title := r.URL.Path[len("/edit/"):]
+	p, err := loadPage(title)
+	if err != nil {
+		p = &Page{Title: title}
+	}
+	renderTemplate(w, "edit", p)
 }
 func main() {
 	/*
@@ -111,14 +138,20 @@ func main() {
 		[5]
 		- http.HandleFunc, which tells the http package to handle all requests to the web root ("/") with handler.
 	*/
-	http.HandleFunc("/", handler)
-	/* 
-	[7: Add in request for viewHandler]
+	http.HandleFunc("/", homeHandler)
+	/*
+		[7: Add in request handler for viewHandler]
 	*/
-	http.HandleFunc("/view/",viewHandler)
+	http.HandleFunc("/view/", viewHandler)
+	/*
+		[8]
+	*/
+	http.HandleFunc("/edit/", editHandler)
+	// http.HandleFunc("/save/", saveHandler)
 	/*
 		[6]
 		- It then calls http.ListenAndServe, specifying that it should listen on port 8080 on any interface (":8080"). (Don't worry about its second parameter, nil, for now.) This function will block until the program is terminated.
+
 		- ListenAndServe always returns an error, since it only returns when an unexpected error occurs. In order to log that error we wrap the function call with log.Fatal.
 	*/
 	log.Fatal(http.ListenAndServe(":8080", nil))
