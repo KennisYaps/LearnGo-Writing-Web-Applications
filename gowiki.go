@@ -3,12 +3,16 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
+	"net/http"
 )
 
 /*
 [1]
 - Define data structure for wiki. Here it describe how page data will be stored in memory
+
 - type []byte means "a byte slice"
+
 - Body element is a []byte rather than string because that is the type expected by the io libraries
 
 */
@@ -20,11 +24,17 @@ type Page struct {
 /*
 [2: Save the Page's Body to a text file]
 - This method's signature reads: "This is a method named save that takes as its receiver p, a pointer to Page . It takes no parameters, and returns a value of type error."
+
 - This method will save the Page's Body to a text file. For simplicity, we will use the Title as the file name.
+
 - The save method returns an error value because that is the return type of WriteFile
+
 - .WriteFile is a standard library function that writes a byte slice to a file
+
 - The save method returns the error value, to let the application handle it should anything go wrong while writing the file.
+
 - If all goes well, Page.save() will return nil (the zero-value for pointers, interfaces, and some other types).
+
 - The octal integer literal 0600, passed as the third parameter to WriteFile, indicates that the file should be created with read-write permissions for the current user only.
 
 */
@@ -37,9 +47,13 @@ func (p *Page) save() error {
 /*
 [3: To load pages]
 - constructs the file name from the title parameter
+
 - reads the file's contents into a new variable body
+
 - returns a pointer to a Page literal constructed with the proper title and body values and also error
+
 - io.ReadFile returns []byte and error.
+
 - Callers of this function can now check the second parameter; if it is nil then it has successfully loaded a Page. If not, it will be an error that can be handled by the caller
 
 */
@@ -52,9 +66,60 @@ func loadPage(title string) (*Page, error) {
 	return &Page{Title: title, Body: body}, nil
 }
 
+/*
+[7]
+- The function handler is of the type http.HandlerFunc. It takes an http.ResponseWriter and an http.Request as its arguments.
+
+- An http.ResponseWriter value assembles the HTTP server's response; by writing to it, we send data to the HTTP client.
+
+- An http.Request is a data structure that represents the client HTTP request.
+
+- r.URL.Path is the path component of the request URL.
+
+- The trailing [1:] means "create a sub-slice of Path from the 1st character to the end." This drops the leading "/" from the path name.
+*/
+func handler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprint(w, "Hello world. This is the main page")
+	fmt.Fprintf(w, "Hi there, I am testing. Here's the path: %s", r.URL.Path[1:])
+}
+
+/*
+[8: handle URLs prefixed with "/view/"]
+- create a handler, viewHandler that will allow users to view a wiki page.
+
+- this function extracts the page title from r.URL.Path
+
+- The Path is re-sliced with [len("/view/"):] to drop the leading "/view/" component of the request path. This is because the path will invariably begin with "/view/", which is not part of the page's title.
+
+- The function then loads the page data, formats the page with a string of simple HTML, and writes it to w, the http.ResponseWriter.
+*/
+func viewHandler(w http.ResponseWriter, r *http.Request) {
+	title := r.URL.Path[len("/view/"):]
+	p, _ := loadPage(title)
+	fmt.Fprintf(w, " <h1>%s<h1><div>%s<div> ", p.Title, p.Body)
+}
 func main() {
+	/*
+		[4: Testing]
+	*/
 	p1 := &Page{Title: "Test Page", Body: []byte("This is a sample page")}
 	p1.save()
 	p2, _ := loadPage("Test Page")
 	fmt.Println(string(p2.Body))
+
+	/*
+		[5]
+		- http.HandleFunc, which tells the http package to handle all requests to the web root ("/") with handler.
+	*/
+	http.HandleFunc("/", handler)
+	/* 
+	[7: Add in request for viewHandler]
+	*/
+	http.HandleFunc("/view/",viewHandler)
+	/*
+		[6]
+		- It then calls http.ListenAndServe, specifying that it should listen on port 8080 on any interface (":8080"). (Don't worry about its second parameter, nil, for now.) This function will block until the program is terminated.
+		- ListenAndServe always returns an error, since it only returns when an unexpected error occurs. In order to log that error we wrap the function call with log.Fatal.
+	*/
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
