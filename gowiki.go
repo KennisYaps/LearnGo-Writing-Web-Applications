@@ -104,10 +104,18 @@ func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
 - The Path is re-sliced with [len("/view/"):] to drop the leading "/view/" component of the request path. This is because the path will invariably begin with "/view/", which is not part of the page's title.
 
 - The function then loads the page data, formats the page with a string of simple HTML, and writes it to w, the http.ResponseWriter.
+
+- Instead, if the requested Page doesn't exist, it should redirect the client to the edit Page using http.Redirect
+
+- The http.Redirect function adds an HTTP status code of http.StatusFound (302) and a Location header to the HTTP response.
 */
 func viewHandler(w http.ResponseWriter, r *http.Request) {
 	title := r.URL.Path[len("/view/"):]
-	p, _ := loadPage(title)
+	p, err := loadPage(title)
+	if err != nil {
+		http.Redirect(w, r, "/edit/"+title, http.StatusFound)
+		return
+	}
 	renderTemplate(w, "view", p)
 }
 
