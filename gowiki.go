@@ -1,10 +1,12 @@
 package main
 
 import (
+	"errors"
 	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"regexp"
 )
 
 /*
@@ -114,6 +116,21 @@ func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
 }
 
 /*
+[13: Validation]
+- If the title is valid, it will be returned along with a nil error value. If the title is invalid, the function will write a "404 Not Found" error to the HTTP connection, and return an error to the handler. To create a new error, we have to import the errors package.
+*/
+var validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9]+)$")
+
+func getTitle(w http.ResponseWriter, r *http.Request) (string, error) {
+	m := validPath.FindStringSubmatch(r.URL.Path)
+	if m == nil {
+		http.NotFound(w, r)
+		return "", errors.New("Invalid page title")
+	}
+	return m[2], nil // the title is the second subexpression
+}
+
+/*
 [8: handle URLs prefixed with "/view/"]
 - create a handler, viewHandler that will allow users to view a wiki page.
 
@@ -128,7 +145,10 @@ func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
 - The http.Redirect function adds an HTTP status code of http.StatusFound (302) and a Location header to the HTTP response.
 */
 func viewHandler(w http.ResponseWriter, r *http.Request) {
-	title := r.URL.Path[len("/view/"):]
+	title, err := getTitle(w, r)
+	if err != nil {
+		return
+	}
 	p, err := loadPage(title)
 	if err != nil {
 		http.Redirect(w, r, "/edit/"+title, http.StatusFound)
@@ -144,7 +164,10 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
 - The method t.Execute executes the template, writing the generated HTML to the http.ResponseWriter.
 */
 func editHandler(w http.ResponseWriter, r *http.Request) {
-	title := r.URL.Path[len("/edit/"):]
+	title, err := getTitle(w, r)
+	if err != nil {
+		return
+	}
 	p, err := loadPage(title)
 	if err != nil {
 		p = &Page{Title: title}
@@ -164,10 +187,13 @@ func editHandler(w http.ResponseWriter, r *http.Request) {
 
 */
 func saveHandler(w http.ResponseWriter, r *http.Request) {
-	title := r.URL.Path[len("/save/"):]
+	title, err := getTitle(w, r)
+	if err != nil {
+		return
+	}
 	body := r.FormValue("body")
 	p := &Page{Title: title, Body: []byte(body)}
-	err := p.save()
+	err = p.save()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
