@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"html/template"
 	"io/ioutil"
 	"log"
@@ -87,6 +86,18 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 /*
+[12: Template caching]
+- create a global variable named templates, and initialize it with ParseFiles
+
+- The function template.Must is a convenience wrapper that panics when passed a non-nil error value, and otherwise returns the *Template unaltered.
+
+- A panic is appropriate here; if the templates can't be loaded the only sensible thing to do is exit the program.
+
+- ParseFiles function takes any number of string arguments that identify our template files, and parses those files into templates that are named after the base file name.
+*/
+var templates = template.Must(template.ParseFiles("home.html", "edit.html", "view.html"))
+
+/*
 [10]
 - Error Handling:
 A better solution is to handle the errors and return an error message to the user. That way if something does go wrong, the server will function exactly how we want and the user can be notifie
@@ -95,14 +106,10 @@ A better solution is to handle the errors and return an error message to the use
 */
 
 func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
-	t, err := template.ParseFiles(tmpl + ".html")
+	err := templates.ExecuteTemplate(w, tmpl+".html", p)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
-	}
-	err = t.Execute(w, p)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
@@ -168,14 +175,6 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/view/"+title, http.StatusFound)
 }
 func main() {
-	/*
-		[4: Testing]
-	*/
-	p1 := &Page{Title: "Test Page", Body: []byte("This is a sample page")}
-	p1.save()
-	p2, _ := loadPage("Test Page")
-	fmt.Println(string(p2.Body))
-
 	/*
 		[5]
 		- http.HandleFunc, which tells the http package to handle all requests to the web root ("/") with handler.
