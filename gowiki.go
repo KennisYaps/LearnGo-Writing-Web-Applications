@@ -88,11 +88,22 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 
 /*
 [10]
+- Error Handling:
+A better solution is to handle the errors and return an error message to the user. That way if something does go wrong, the server will function exactly how we want and the user can be notifie
+
+- The http.Error function sends a specified HTTP response code (in this case "Internal Server Error") and error message.
 */
 
 func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
-	t, _ := template.ParseFiles(tmpl + ".html")
-	t.Execute(w, p)
+	t, err := template.ParseFiles(tmpl + ".html")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = t.Execute(w, p)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 /*
@@ -137,7 +148,7 @@ func editHandler(w http.ResponseWriter, r *http.Request) {
 /*
 [11: The function saveHandler will handle the submission of forms located on the edit pages.]
 
-- The page title (provided in the URL) and the form's only field, Body, are stored in a new Page. 
+- The page title (provided in the URL) and the form's only field, Body, are stored in a new Page.
 
 - The save() method is then called to write the data to a file, and the client is redirected to the /view/ page.
 
@@ -149,7 +160,11 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 	title := r.URL.Path[len("/save/"):]
 	body := r.FormValue("body")
 	p := &Page{Title: title, Body: []byte(body)}
-	p.save()
+	err := p.save()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	http.Redirect(w, r, "/view/"+title, http.StatusFound)
 }
 func main() {
